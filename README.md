@@ -1,13 +1,15 @@
 OpenGL ES 3.0 Programming Guide
 ===============================
 
-This repository contains the sample code for the OpenGL ES 3.0 Programming Guide by Addison-Wesley Professional (http://www.opengles-book.com). 
+This repository is a fork of the original OpenGL ES 3.0 sample code repository with the addition of the Linux DRM platform.
+The repository contains the sample code for the OpenGL ES 3.0 Programming Guide by Addison-Wesley Professional (http://www.opengles-book.com). 
 
 ## Platforms ##
 The sample code for the OpenGL ES 3.0 Programming Guide currently builds on the following platforms:
 
 * Microsoft Windows 
 * Linux X11
+* Linux DRM
 * Android 4.3+ NDK (C/C++)
 * Android 4.3+ SDK (Java)
 * iOS7
