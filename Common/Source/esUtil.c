@@ -199,14 +199,23 @@ GLboolean ESUTIL_API esCreateWindow ( ESContext *esContext, const char *title, G
       // Choose config
       if ( !eglChooseConfig ( esContext->eglDisplay, attribList, &config, 1, &numConfigs ) )
       {
+         fprintf(stderr, "eglChooseConfig failed\n");
          return GL_FALSE;
       }
 
       if ( numConfigs < 1 )
       {
+         fprintf(stderr, "Failing: Not enough configs available\n");
+         return GL_FALSE;
+      }
+
+      if ( numConfigs > 1 )
+      {
+         fprintf(stderr, "Failing: Too many configs available.  Need to match to visual.\n");
          return GL_FALSE;
       }
    }
+   printf("Wahoo, got a config\n");
 
 
 #ifdef ANDROID
@@ -219,20 +228,23 @@ GLboolean ESUTIL_API esCreateWindow ( ESContext *esContext, const char *title, G
 #endif // ANDROID
 
    // Create a surface
-   esContext->eglSurface = eglCreateWindowSurface ( esContext->eglDisplay, config, 
-                                                    esContext->eglNativeWindow, NULL );
-
+   if (!esContext->eglSurface)
+       esContext->eglSurface = eglCreateWindowSurface ( esContext->eglDisplay, config, 
+                                                        esContext->eglNativeWindow, NULL );
    if ( esContext->eglSurface == EGL_NO_SURFACE )
    {
+      fprintf(stderr, "Failing: EGL_NO_SURFACE\n");
       return GL_FALSE;
    }
 
    // Create a GL context
-   esContext->eglContext = eglCreateContext ( esContext->eglDisplay, config, 
+   if (!esContext->eglContext)
+       esContext->eglContext = eglCreateContext ( esContext->eglDisplay, config, 
                                               EGL_NO_CONTEXT, contextAttribs );
 
    if ( esContext->eglContext == EGL_NO_CONTEXT )
    {
+      fprintf(stderr, "Failing: EGL_NO_CONTEXT\n");
       return GL_FALSE;
    }
 
@@ -240,9 +252,9 @@ GLboolean ESUTIL_API esCreateWindow ( ESContext *esContext, const char *title, G
    if ( !eglMakeCurrent ( esContext->eglDisplay, esContext->eglSurface, 
                           esContext->eglSurface, esContext->eglContext ) )
    {
+      fprintf(stderr, "Failed eglMakeCurrent\n");
       return GL_FALSE;
    }
-
 #endif // #ifndef __APPLE__
 
    return GL_TRUE;

@@ -75,7 +75,7 @@ const struct gbm * init_gbm(int drm_fd, int w, int h, uint32_t format, uint64_t 
 	return &gbm;
 }
 
-static bool has_ext(const char *extension_list, const char *ext)
+bool has_ext(const char *extension_list, const char *ext)
 {
 	const char *ptr = extension_list;
 	int len = strlen(ext);

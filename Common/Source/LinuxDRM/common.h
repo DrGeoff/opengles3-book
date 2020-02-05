@@ -104,7 +104,7 @@ struct gbm {
 };
 
 const struct gbm * init_gbm(int drm_fd, int w, int h, uint32_t format, uint64_t modifier);
-
+bool has_ext(const char *extension_list, const char *ext);
 
 struct egl {
 	EGLDisplay display;

@@ -33,9 +33,12 @@
 #include "drm-legacy.h"
 
 // DRM local variables
-static struct egl egl;   // TODO: This egl is basically an ESContext.  Need to think
-static const struct gbm *gbm;  // actual object is a static variable in common.c
-static const struct drm *drm;  // actual object is a static variable in drm-legacy.c
+static struct Platform
+{
+    struct egl egl;   // TODO: This egl is basically an ESContext.  Need to think
+    const struct gbm *gbm;  // actual object is a static variable in common.c
+    const struct drm *drm;  // actual object is a static variable in drm-legacy.c
+} platform;
 
 ///
 //  WinCreate()
@@ -45,8 +48,8 @@ static const struct drm *drm;  // actual object is a static variable in drm-lega
 EGLBoolean WinCreate(ESContext *esContext, const char *title)
 {
     const char *device = "/dev/dri/card1";
-    drm = init_drm_legacy(device, "", 0);
-    if (!drm) {
+    platform.drm = init_drm_legacy(device, "", 0);
+    if (!platform.drm) {
         printf("Failed to initialize DRM %s\n", device);
         return EGL_FALSE;
     }
@@ -54,22 +57,22 @@ EGLBoolean WinCreate(ESContext *esContext, const char *title)
     uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
     uint32_t format = DRM_FORMAT_XRGB8888;
 
-    printf("Try to init gbm with fd=%i, h=%i v=%i\n", drm->fd, drm->mode->hdisplay, drm->mode->vdisplay);
-    gbm = init_gbm(drm->fd, drm->mode->hdisplay, drm->mode->vdisplay, format, modifier);
-	if (!gbm) {
+    printf("Try to init gbm with fd=%i, h=%i v=%i\n", platform.drm->fd, platform.drm->mode->hdisplay, platform.drm->mode->vdisplay);
+    platform.gbm = init_gbm(platform.drm->fd, platform.drm->mode->hdisplay, platform.drm->mode->vdisplay, format, modifier);
+	if (!platform.gbm) {
         printf("Failed to initialize GBM\n");
         return EGL_FALSE;
 	}
 
-    if (init_egl(&egl, gbm, 0))
-    {
-		return EGL_FALSE;
-    }
+    esContext->platformData = (void *) &platform;
+	esContext->eglNativeDisplay = (EGLNativeDisplayType)platform.gbm->dev;
+    esContext->eglNativeWindow = (EGLNativeWindowType)platform.gbm->surface;
 
-	esContext->eglNativeDisplay = (EGLNativeDisplayType)gbm->dev;
-    esContext->eglDisplay=egl.display;
-    esContext->eglContext=egl.context;
-    esContext->eglSurface=egl.surface;
+    init_egl(&platform.egl, platform.gbm, 0);
+    esContext->eglDisplay=platform.egl.display;
+    esContext->eglContext=platform.egl.context;
+    esContext->eglSurface=platform.egl.surface;
+
     return EGL_TRUE;
 }
 
@@ -142,7 +145,7 @@ void WinLoop ( ESContext *esContext )
 	int ret;
 
     eglSwapBuffers(esContext->eglDisplay, esContext->eglSurface);
-	bo = gbm_surface_lock_front_buffer(gbm->surface);
+	bo = gbm_surface_lock_front_buffer(platform.gbm->surface);
 	if (!bo) {
 		fprintf(stderr, "Failed to lock the front buffer\n");
 		return;
@@ -155,8 +158,8 @@ void WinLoop ( ESContext *esContext )
 	}
 
 	/* set mode: */
-	ret = drmModeSetCrtc(drm->fd, drm->crtc_id, fb->fb_id, 0, 0,
-			(uint32_t*)&drm->connector_id, 1, drm->mode);
+	ret = drmModeSetCrtc(platform.drm->fd, platform.drm->crtc_id, fb->fb_id, 0, 0,
+			(uint32_t*)&platform.drm->connector_id, 1, platform.drm->mode);
 	if (ret) {
 		printf("failed to set mode: %s\n", strerror(errno));
 		return;
@@ -181,7 +184,7 @@ void WinLoop ( ESContext *esContext )
 		//egl.draw(i++);
 
         eglSwapBuffers(esContext->eglDisplay, esContext->eglSurface);
-		next_bo = gbm_surface_lock_front_buffer(gbm->surface);
+		next_bo = gbm_surface_lock_front_buffer(platform.gbm->surface);
 		fb = drm_fb_get_from_bo(next_bo);
 		if (!fb) {
 			fprintf(stderr, "Failed to get a new framebuffer BO\n");
@@ -193,7 +196,7 @@ void WinLoop ( ESContext *esContext )
 		 * hw composition
 		 */
 
-		ret = drmModePageFlip(drm->fd, drm->crtc_id, fb->fb_id,
+		ret = drmModePageFlip(platform.drm->fd, platform.drm->crtc_id, fb->fb_id,
 				DRM_MODE_PAGE_FLIP_EVENT, &waiting_for_flip);
 		if (ret) {
 			printf("failed to queue page flip: %s\n", strerror(errno));
@@ -203,9 +206,9 @@ void WinLoop ( ESContext *esContext )
 		while (waiting_for_flip) {
 			FD_ZERO(&fds);
 			FD_SET(0, &fds);
-			FD_SET(drm->fd, &fds);
+			FD_SET(platform.drm->fd, &fds);
 
-			ret = select(drm->fd + 1, &fds, NULL, NULL, NULL);
+			ret = select(platform.drm->fd + 1, &fds, NULL, NULL, NULL);
 			if (ret < 0) {
 				printf("select err: %s\n", strerror(errno));
 				return;
@@ -216,11 +219,11 @@ void WinLoop ( ESContext *esContext )
 				printf("user interrupted!\n");
 				return;
 			}
-			drmHandleEvent(drm->fd, &evctx);
+			drmHandleEvent(platform.drm->fd, &evctx);
 		} 
 
 		/* release last buffer to render on again: */
-		gbm_surface_release_buffer(gbm->surface, bo);
+		gbm_surface_release_buffer(platform.gbm->surface, bo);
 		bo = next_bo;
 
         totaltime += deltatime;
